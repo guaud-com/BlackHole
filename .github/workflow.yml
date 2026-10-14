@@ -1,0 +1,72 @@
+name: Build BlackHole Driver guaud
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Build BlackHole directly (skip signing)
+        run: |
+          xcodebuild \
+            -project BlackHole.xcodeproj \
+            -configuration Release \
+            -target BlackHole \
+            CONFIGURATION_BUILD_DIR=build \
+            PRODUCT_BUNDLE_IDENTIFIER=audio.existential.BlackHole2ch \
+            GCC_PREPROCESSOR_DEFINITIONS='$GCC_PREPROCESSOR_DEFINITIONS kNumber_Of_Channels=2 kPlugIn_BundleID=\"audio.existential.BlackHole2ch\" kHas_Driver_Name_Format=false kDriver_Name=\"伴奏通道立体声\" kDevice_Name=\"伴奏通道立体声\" kDevice2_Name=\"直播通道\" kDevice_IsHidden=false kDevice_HasInput=true kDevice_HasOutput=true kDevice2_IsHidden=false kDevice2_HasInput=true kDevice2_HasOutput=true' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
+
+      - name: Verify built driver
+        run: |
+          ls -la build/
+          test -d build/BlackHole.driver
+
+      - name: Create package
+        run: |
+          # 构造 pkg 的目录结构
+          mkdir -p pkgroot/Library/Audio/Plug-Ins/HAL
+          cp -R build/BlackHole.driver pkgroot/Library/Audio/Plug-Ins/HAL/
+
+          # 准备 postinstall 脚本，安装后自动重启音频服务
+          mkdir -p scripts
+          cat > scripts/postinstall << 'EOF'
+          #!/bin/bash
+          launchctl kickstart -k system/com.apple.audio.coreaudiod
+          exit 0
+          EOF
+          chmod +x scripts/postinstall
+
+          # 打包，带上 scripts
+          pkgbuild \
+            --root pkgroot \
+            --identifier audio.existential.BlackHole2ch \
+            --version ${{ steps.version.outputs.version }} \
+            --install-location / \
+            --scripts scripts \
+            BlackHole2ch.pkg
+
+      - name: Upload the .pkg artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: BlackHole-Installer
+          path: BlackHole2ch.pkg
+          if-no-files-found: error
