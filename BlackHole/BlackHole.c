@@ -338,6 +338,8 @@ static const UInt32                 kDevice_SampleRatesSize             = sizeof
 #define                             kBytes_Per_Frame                    (kNumber_Of_Channels * kBytes_Per_Channel)
 #define                             kRing_Buffer_Frame_Size             ((65536 + kLatency_Frame_Size))
 static Float32*                     gRingBuffer = NULL;
+static Float32*                     gRingBuffer2 = NULL;
+
 
 
 //==================================================================================================
@@ -4342,6 +4344,8 @@ static OSStatus	BlackHole_StartIO(AudioServerPlugInDriverRef inDriver, AudioObje
         gDevice_AnchorHostTime = mach_absolute_time();
         gDevice_PreviousTicks = 0;
         gRingBuffer = calloc(kRing_Buffer_Frame_Size * kNumber_Of_Channels, sizeof(Float32));
+		gRingBuffer2 = calloc(kRing_Buffer_Frame_Size * kNumber_Of_Channels, sizeof(Float32));
+		
     }
     
     
@@ -4379,7 +4383,9 @@ static OSStatus	BlackHole_StopIO(AudioServerPlugInDriverRef inDriver, AudioObjec
     if (!gDevice_IOIsRunning && !gDevice2_IOIsRunning && gRingBuffer != NULL)
     {
         free(gRingBuffer);
+		free(gRingBuffer2);
         gRingBuffer = NULL;
+		gRingBuffer2 = NULL;
     }
 	
 	//	unlock the state lock
@@ -4519,9 +4525,9 @@ Done:
 
 static OSStatus	BlackHole_DoIOOperation(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, AudioObjectID inStreamObjectID, UInt32 inClientID, UInt32 inOperationID, UInt32 inIOBufferFrameSize, const AudioServerPlugInIOCycleInfo* inIOCycleInfo, void* ioMainBuffer, void* ioSecondaryBuffer)
 {
-	//	This is called to actually perform a given operation. 
+	//	This is called to actually perform a given operation.
 	
-	#pragma unused(inClientID, inIOCycleInfo, ioSecondaryBuffer, inDeviceObjectID)
+	#pragma unused(inClientID, inIOCycleInfo, ioSecondaryBuffer)
 	
 	//	declare the local variables
 	OSStatus theAnswer = 0;
@@ -4530,6 +4536,9 @@ static OSStatus	BlackHole_DoIOOperation(AudioServerPlugInDriverRef inDriver, Aud
 	FailWithAction(inDriver != gAudioServerPlugInDriverRef, theAnswer = kAudioHardwareBadObjectError, Done, "BlackHole_DoIOOperation: bad driver reference");
 	FailWithAction(inDeviceObjectID != kObjectID_Device && inDeviceObjectID != kObjectID_Device2, theAnswer = kAudioHardwareBadObjectError, Done, "BlackHole_DoIOOperation: bad device ID");
 	FailWithAction((inStreamObjectID != kObjectID_Stream_Input) && (inStreamObjectID != kObjectID_Stream_Output), theAnswer = kAudioHardwareBadObjectError, Done, "BlackHole_DoIOOperation: bad stream ID");
+
+    // 根据当前是哪个设备，选择对应的环形缓冲区
+    Float32* theRingBuffer = (inDeviceObjectID == kObjectID_Device2) ? gRingBuffer2 : gRingBuffer;
 
     // Calculate the ring buffer offsets and splits.
     UInt64 mSampleTime = inOperationID == kAudioServerPlugInIOOperationReadInput ? inIOCycleInfo->mInputTime.mSampleTime : inIOCycleInfo->mOutputTime.mSampleTime;
@@ -4560,24 +4569,23 @@ static OSStatus	BlackHole_DoIOOperation(AudioServerPlugInDriverRef inDriver, Aud
             vDSP_vclr(ioMainBuffer, 1, inIOBufferFrameSize * kNumber_Of_Channels);
             
             // Clear the ring buffer.
-            if (!isBufferClear)
+            if (!isBufferClear && theRingBuffer != NULL)
             {
-                vDSP_vclr(gRingBuffer, 1, kRing_Buffer_Frame_Size * kNumber_Of_Channels);
+                vDSP_vclr(theRingBuffer, 1, kRing_Buffer_Frame_Size * kNumber_Of_Channels);
                 isBufferClear = true;
             }
         }
         else
         {
             // Copy the buffers.
-            memcpy(ioMainBuffer, gRingBuffer + ringBufferFrameLocationStart * kNumber_Of_Channels, firstPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
-            memcpy((Float32*)ioMainBuffer + firstPartFrameSize * kNumber_Of_Channels, gRingBuffer, secondPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
+            memcpy(ioMainBuffer, theRingBuffer + ringBufferFrameLocationStart * kNumber_Of_Channels, firstPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
+            memcpy((Float32*)ioMainBuffer + firstPartFrameSize * kNumber_Of_Channels, theRingBuffer, secondPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
             
             // Finally we'll apply the output volume to the buffer.
 	    if(kEnableVolumeControl)
 	    {
 	 	vDSP_vsmul(ioMainBuffer, 1, &gVolume_Master_Value, ioMainBuffer, 1, inIOBufferFrameSize * kNumber_Of_Channels);
 	    }
-
         }
     }
     
@@ -4591,12 +4599,10 @@ static OSStatus	BlackHole_DoIOOperation(AudioServerPlugInDriverRef inDriver, Aud
             DebugMsg("BlackHole overload error. kAudioServerPlugInIOOperationWriteMix was unable to complete operation before the deadline. Try increasing the buffer frame size.");
             return kAudioHardwareUnspecifiedError;
         }
-        // TODO: Mix into the buffers but we will need to clear the buffers at some point.
-        // Issue with outputting from mirrored device and main device at the same time. Not currently mixing. 
         
         // Copy the buffers.
-        memcpy(gRingBuffer + ringBufferFrameLocationStart * kNumber_Of_Channels, ioMainBuffer, firstPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
-        memcpy(gRingBuffer, (Float32*)ioMainBuffer + firstPartFrameSize * kNumber_Of_Channels, secondPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
+        memcpy(theRingBuffer + ringBufferFrameLocationStart * kNumber_Of_Channels, ioMainBuffer, firstPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
+        memcpy(theRingBuffer, (Float32*)ioMainBuffer + firstPartFrameSize * kNumber_Of_Channels, secondPartFrameSize * kNumber_Of_Channels * sizeof(Float32));
         
         // Save the last output time.
         lastOutputSampleTime = inIOCycleInfo->mOutputTime.mSampleTime + inIOBufferFrameSize;
