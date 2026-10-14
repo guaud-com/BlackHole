@@ -1,4 +1,4 @@
-name: Build BlackHole Driver
+name: Build BlackHole Driver 0000
 
 on:
   workflow_dispatch: # 允许你手动点击按钮触发编译
@@ -30,7 +30,7 @@ jobs:
             -target BlackHole \
             CONFIGURATION_BUILD_DIR=build \
             PRODUCT_BUNDLE_IDENTIFIER=audio.existential.BlackHole2ch \
-            GCC_PREPROCESSOR_DEFINITIONS='$GCC_PREPROCESSOR_DEFINITIONS kNumber_Of_Channels=2 kPlugIn_BundleID=\"audio.existential.BlackHole2ch\" kDriver_Name=\"BlackHole\" kDevice_IsHidden=false kDevice_HasInput=true kDevice_HasOutput=true kDevice2_IsHidden=false kDevice2_HasInput=true kDevice2_HasOutput=true' \
+            GCC_PREPROCESSOR_DEFINITIONS='$GCC_PREPROCESSOR_DEFINITIONS kNumber_Of_Channels=2 kPlugIn_BundleID=\"audio.existential.BlackHole2ch\" kDriver_Name=\"BlackHole\" kDevice_IsHidden=false kDevice_HasInput=true kDevice_HasOutput=false kDevice2_IsHidden=false kDevice2_HasInput=false kDevice2_HasOutput=true' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
