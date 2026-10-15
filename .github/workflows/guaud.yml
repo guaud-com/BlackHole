@@ -50,7 +50,7 @@ jobs:
           mkdir -p scripts
           cat > scripts/postinstall << 'EOF'
           #!/bin/bash
-          launchctl kickstart -k system/com.apple.audio.coreaudiod
+          launchctl kickstart -k system/com.apple.audio.coreaudiod 2>/dev/null || killall -9 coreaudiod 2>/dev/null || true
           exit 0
           EOF
           chmod +x scripts/postinstall
