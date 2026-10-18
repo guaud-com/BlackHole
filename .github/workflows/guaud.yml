@@ -29,7 +29,7 @@ jobs:
             -target BlackHole \
             CONFIGURATION_BUILD_DIR=build \
             PRODUCT_BUNDLE_IDENTIFIER=audio.existential.BlackHole2ch \
-            GCC_PREPROCESSOR_DEFINITIONS='$GCC_PREPROCESSOR_DEFINITIONS kNumber_Of_Channels=2 kPlugIn_BundleID=\"audio.existential.BlackHole2ch\" kHas_Driver_Name_Format=false kDriver_Name=\"伴奏通道\" kDevice_Name=\"伴奏通道\" kDevice2_Name=\"直播通道\" kDevice_IsHidden=false kDevice_HasInput=true kDevice_HasOutput=true kDevice2_IsHidden=false kDevice2_HasInput=true kDevice2_HasOutput=true' \
+            GCC_PREPROCESSOR_DEFINITIONS='$GCC_PREPROCESSOR_DEFINITIONS kNumber_Of_Channels=2 kPlugIn_BundleID=\"audio.existential.BlackHole2ch\" kHas_Driver_Name_Format=false kDriver_Name=\"直播通道" kDevice_Name=\"直播通道" kDevice2_Name=\"伴奏通道" kDevice_IsHidden=false kDevice_HasInput=true kDevice_HasOutput=true kDevice2_IsHidden=false kDevice2_HasInput=true kDevice2_HasOutput=true' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
